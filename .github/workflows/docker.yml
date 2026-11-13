@@ -38,12 +38,12 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test (amd64)
         run: |
-          docker run -d --name t -p 8888:8888 "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
+          docker run -d --name smoke -p 8888:8888 "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
           for i in $(seq 1 30); do curl -fs http://localhost:8888/api/status && break; sleep 2; done
-          docker logs t
+          docker logs smoke
           # no password/token: API reachable without auth
           curl -fs http://localhost:8888/api/contents/sharedFolder > /dev/null
           # root is the real /, start folder is /sharedFolder
           curl -fs http://localhost:8888/api/contents/ | grep -q '"sharedFolder"'
           curl -fs http://localhost:8888/lab | grep -o '"preferredPath": *"[^"]*"' | tee /dev/stderr | grep -q sharedFolder
-          docker exec t jupyter kernelspec list | grep -q ' ir '
+          docker exec smoke jupyter kernelspec list | grep -q ' ir '
