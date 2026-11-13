@@ -35,6 +35,10 @@ RUN R -q -e 'install.packages("IRkernel")' \
 # Extra R packages for the course: add them here, e.g.
 # RUN R -q -e 'install.packages(c("ggplot2", "dplyr"))'
 
+# File browser shows the real container filesystem (root = /) and opens in
+# /sharedFolder, so the path students see is the real one: /sharedFolder/...
+# Only files saved under /sharedFolder are kept on the host.
+
 # Non-root user. HOME is world-writable so the container also works when the
 # run script starts it with the host UID (Linux) to keep file permissions right.
 RUN useradd -m -s /bin/bash -u "${NB_UID}" "${NB_USER}" \
@@ -49,6 +53,7 @@ EXPOSE 8888
 ENTRYPOINT ["tini", "-g", "--"]
 CMD ["jupyter", "lab", \
      "--ip=0.0.0.0", "--port=8888", "--no-browser", \
-     "--ServerApp.root_dir=/sharedFolder", \
+     "--ServerApp.root_dir=/", \
+     "--ServerApp.preferred_dir=/sharedFolder", \
      "--IdentityProvider.token=", \
      "--ServerApp.allow_remote_access=True"]

@@ -26,6 +26,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -35,3 +36,14 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Smoke test (amd64)
+        run: |
+          docker run -d --name t -p 8888:8888 "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
+          for i in $(seq 1 30); do curl -fs http://localhost:8888/api/status && break; sleep 2; done
+          docker logs t
+          # no password/token: API reachable without auth
+          curl -fs http://localhost:8888/api/contents/sharedFolder > /dev/null
+          # root is the real /, start folder is /sharedFolder
+          curl -fs http://localhost:8888/api/contents/ | grep -q '"sharedFolder"'
+          curl -fs http://localhost:8888/lab | grep -o '"preferredPath": *"[^"]*"' | tee /dev/stderr | grep -q sharedFolder
+          docker exec t jupyter kernelspec list | grep -q ' ir '
