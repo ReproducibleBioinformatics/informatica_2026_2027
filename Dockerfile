@@ -21,7 +21,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-pip \
         libzmq3-dev libcurl4-openssl-dev libssl-dev libxml2-dev \
-        git curl ca-certificates tini \
+        git curl ca-certificates tini sudo \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m venv "$VIRTUAL_ENV" \
  && pip install --no-cache-dir --upgrade pip \
@@ -39,18 +39,26 @@ RUN R -q -e 'install.packages("IRkernel")' \
 # /sharedFolder, so the path students see is the real one: /sharedFolder/...
 # Only files saved under /sharedFolder are kept on the host.
 
-# Non-root user. HOME is world-writable so the container also works when the
-# run script starts it with the host UID (Linux) to keep file permissions right.
-RUN useradd -m -s /bin/bash -u "${NB_UID}" "${NB_USER}" \
+# User "student": owns the Python environment (pip install works without
+# sudo), can write the R site-library (install.packages works), and has
+# passwordless sudo (apt-get etc.), like ROOT=true in the old rocker setup.
+# On Linux, start.sh changes its UID/GID to the host user's at startup.
+RUN useradd -m -s /bin/bash -u "${NB_UID}" -G staff,sudo "${NB_USER}" \
+ && echo "${NB_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${NB_USER} \
+ && echo 'Defaults secure_path="/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/sudoers.d/${NB_USER} \
+ && chmod 0440 /etc/sudoers.d/${NB_USER} \
+ && chown -R "${NB_USER}:${NB_USER}" /opt/venv \
+ && chmod -R g+w /usr/local/lib/R/site-library \
  && mkdir -p /sharedFolder \
- && chmod 1777 /home/${NB_USER} /sharedFolder
+ && chown "${NB_USER}:${NB_USER}" /sharedFolder
+
+COPY --chmod=755 start.sh /usr/local/bin/start.sh
 
 ENV HOME=/home/${NB_USER}
-USER ${NB_UID}
 WORKDIR /sharedFolder
 EXPOSE 8888
 
-ENTRYPOINT ["tini", "-g", "--"]
+ENTRYPOINT ["tini", "-g", "--", "/usr/local/bin/start.sh"]
 CMD ["jupyter", "lab", \
      "--ip=0.0.0.0", "--port=8888", "--no-browser", \
      "--ServerApp.root_dir=/", \

@@ -66,9 +66,9 @@ RUN_ARGS=(
     -v "$SHARED_DIR:/sharedFolder"
     --shm-size=2g
 )
-# On Linux run as the current user so files in the shared folder are yours.
+# On Linux the container user takes your UID/GID so files in the shared folder are yours.
 if [[ "$(uname -s)" == Linux ]]; then
-    RUN_ARGS+=( --user "$(id -u):$(id -g)" )
+    RUN_ARGS+=( -e "HOST_UID=$(id -u)" -e "HOST_GID=$(id -g)" )
 fi
 
 echo
