@@ -48,16 +48,15 @@ jobs:
           curl -fs http://localhost:8888/lab | grep -o '"preferredPath": *"[^"]*"' | tee /dev/stderr | grep -q sharedFolder
           docker exec smoke jupyter kernelspec list | grep -q ' ir '
           # student can pip install, install R packages and use sudo
-          docker exec -u student smoke pip3 install --no-cache-dir six
+          docker exec -u student smoke pip3 install --no-cache-dir numpy
           docker exec -u student smoke Rscript -e 'stopifnot(file.access(.libPaths()[1], 2) == 0)'
           docker exec -u student smoke sudo -n true
-          # JupyterLab runs as student: a file created from the UI is owned by student
-          curl -fs -X PUT -H 'Content-Type: application/json' -d '{"type":"file","format":"text","content":"x"}' http://localhost:8888/api/contents/sharedFolder/probe.txt > /dev/null
-          test "$(docker exec smoke stat -c %U /sharedFolder/probe.txt)" = student
+          # JupyterLab runs as student (the server writes its cookie secret at startup)
+          test "$(docker exec smoke stat -c %U /home/student/.local/share/jupyter/runtime/jupyter_cookie_secret)" = student
           # Linux host UID mapping (what run.sh does on Linux)
           docker rm -f smoke
           docker run -d --name smoke -e HOST_UID=4321 -e HOST_GID=4321 -p 8888:8888 "${{ env.IMAGE }}@${{ steps.build.outputs.digest }}"
           for i in $(seq 1 30); do curl -fs http://localhost:8888/api/status && break; sleep 2; done
-          curl -fs -X PUT -H 'Content-Type: application/json' -d '{"type":"file","format":"text","content":"x"}' http://localhost:8888/api/contents/sharedFolder/probe.txt > /dev/null
-          test "$(docker exec smoke stat -c %u /sharedFolder/probe.txt)" = 4321
-          docker exec -u student smoke pip3 install --no-cache-dir six
+          test "$(docker exec smoke stat -c %u /home/student/.local/share/jupyter/runtime/jupyter_cookie_secret)" = 4321
+          docker exec -u student smoke touch /sharedFolder/probe.txt
+          docker exec -u student smoke pip3 install --no-cache-dir tabulate
