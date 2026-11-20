@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # JupyterLab with R — macOS (Intel and Apple Silicon) and Linux.
-# Run with:  bash run.sh
+# Run with:  bash run.sh            (uses the local image, downloads it only the first time)
+#            bash run.sh --update   (downloads the latest image, overwriting the local one)
 # Then open: http://localhost:8888
 # Files saved in the shared folder stay on your computer after you stop it.
 
@@ -12,6 +13,9 @@ PORT=8888
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/configurationFile.txt"
+
+UPDATE=0
+[[ "${1:-}" == "--update" ]] && UPDATE=1
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -53,10 +57,15 @@ if docker ps --format '{{.Ports}}' | grep -q ":$PORT->"; then
     die "Port $PORT is used by another container. Stop it with: docker ps   then   docker rm -f <ID>"
 fi
 
-# --- Pull the native image for this machine ----------------------------------
+# --- Pull the native image only if missing or if --update is given -----------
+# (so an image saved with "docker commit" under the same name is not overwritten)
 echo "Architecture: $ARCH -> $PLATFORM"
-echo "Downloading/updating image (the first time it may take a few minutes)..."
-docker pull --platform "$PLATFORM" "$IMAGE"
+if [[ $UPDATE -eq 1 ]] || ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "Downloading image (it may take a few minutes)..."
+    docker pull --platform "$PLATFORM" "$IMAGE"
+else
+    echo "Using local image (run with --update to download the latest version)."
+fi
 
 RUN_ARGS=(
     --rm -it

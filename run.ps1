@@ -1,5 +1,7 @@
 # JupyterLab with R — Windows (PowerShell).
-# Run with:  powershell -ExecutionPolicy Bypass -File run.ps1
+# Run with:  powershell -ExecutionPolicy Bypass -File run.ps1           (uses the local image)
+#            powershell -ExecutionPolicy Bypass -File run.ps1 -Update   (downloads the latest image)
+param([switch]$Update)
 # Then open: http://localhost:8888
 $ErrorActionPreference = "Stop"
 
@@ -41,8 +43,13 @@ if (docker ps -a --format '{{.Names}}' | Select-String -Pattern "^$Name$" -Quiet
 }
 
 Write-Host "Architecture: $Arch -> $Platform"
-Write-Host "Downloading/updating image (the first time it may take a few minutes)..."
-docker pull --platform $Platform $Image
+docker image inspect $Image *> $null
+if ($Update -or $LASTEXITCODE -ne 0) {
+    Write-Host "Downloading image (it may take a few minutes)..."
+    docker pull --platform $Platform $Image
+} else {
+    Write-Host "Using local image (run with -Update to download the latest version)."
+}
 
 Write-Host ""
 Write-Host "Shared folder: $SharedDir"
